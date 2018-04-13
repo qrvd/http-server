@@ -25,7 +25,7 @@ def main
 	# Read up to this many bytes from the source.
 	# We may receive less, which needs to be dealt with.
 	conn = Connection.new(conn_sock)
-	read_request(conn)
+	p read_request(conn)
 end
 
 class Connection
@@ -59,7 +59,23 @@ end
 
 def read_request(conn)
 	request_line = conn.read_line
-	method, verb, version = request_line.split(" ")
+	method, path, version = request_line.split(" ")
+	headers = {}
+
+	# Read the headers
+	loop do
+		line = conn.read_line()
+		if line.empty?
+			break
+		end
+
+		# Not spec compliant (linear whitespace!) but whatevs.
+		key, value = line.split(/:\s*/, 2)
+		headers[key] = value
+	end
+	Request.new(method, path, headers)
 end
+
+Request = Struct.new(:method, :path, :headers)
 
 main
