@@ -25,7 +25,8 @@ def main
 	# Read up to this many bytes from the source.
 	# We may receive less, which needs to be dealt with.
 	conn = Connection.new(conn_sock)
-	p read_request(conn)
+	request = read_request(conn)
+	respond_for_request(conn_sock, request)
 end
 
 class Connection
@@ -77,5 +78,41 @@ def read_request(conn)
 end
 
 Request = Struct.new(:method, :path, :headers)
+
+def respond(conn_sock, status_code, content)
+	status_text =
+	{
+		200 => "OK",
+		404 => "Not Found"
+	}.fetch(status_code)
+
+	# No additional arguments, so 0.
+	conn_sock.send("HTTP/1.1 #{status_code} #{status_text}\r\n", 0)
+	conn_sock.send("Content-Length: #{content.length}\r\n", 0)
+	conn_sock.send("\r\n", 0)
+	conn_sock.send(content, 0)
+end
+
+def respond_for_request(conn_sock, request)
+
+	# This is unsafe but it works.
+	path = Dir.getwd + request.path
+
+	if File.exists?(path)
+		if File.executable_real?(path)
+			content = `#{path}`
+		elsif path.end_with? ".rb"
+			content = `ruby #{path}`
+		else
+			content = File.read(path)
+		end
+		status_code = 200
+	else
+		status_code = 404
+		content = ""
+	end
+
+	respond(conn_sock, status_code, content)
+end
 
 main
