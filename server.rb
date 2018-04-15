@@ -16,17 +16,23 @@ def main
 	# queued under the current one
 	socket.listen(0)
 
-	# Now, block waiting for a connection.
-	# We get a separate connection socket because we can
-	# accept many simultaneously connections and communicate
-	# with them separately.
-	conn_sock, addr_info = socket.accept
+	connections = []
 
-	# Read up to this many bytes from the source.
-	# We may receive less, which needs to be dealt with.
-	conn = Connection.new(conn_sock)
-	request = read_request(conn)
-	respond_for_request(conn_sock, request)
+	loop do
+		# Now, block waiting for a connection.
+		# We get a separate connection socket because we can
+		# accept many simultaneously connections and communicate
+		# with them separately.
+		conn_sock, addr_info = socket.accept
+		connections << Thread.new do
+			conn = Connection.new(conn_sock)
+			request = read_request(conn)
+			respond_for_request(conn_sock, request)
+			conn_sock.close
+		end
+	end
+
+	connections.map(&:join)
 end
 
 class Connection
@@ -40,6 +46,8 @@ class Connection
 		read_until("\r\n")
 	end
 
+	# Read up to this many bytes from the source, at a time.
+	# We may receive less, which is dealt with in `read_until`.
 	BUFFER_CHUNK_SIZE = 7
 
 	def read_until(string)
